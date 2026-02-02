@@ -1,0 +1,15 @@
+[package]
+name = "gba-pm"
+description = "Prompt manager for GBA - template-based prompt generation with Jinja2"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+minijinja = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+typed-builder = { workspace = true }
+tracing = { workspace = true }
