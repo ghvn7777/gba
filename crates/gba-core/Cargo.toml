@@ -11,7 +11,12 @@ tokio = { workspace = true }
 gba-pm = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 typed-builder = { workspace = true }
 tracing = { workspace = true }
+futures = "0.3"
+
+[dev-dependencies]
+tempfile = { workspace = true }
