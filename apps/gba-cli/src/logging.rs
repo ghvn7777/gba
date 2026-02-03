@@ -32,18 +32,7 @@ pub fn init_tracing(repo_path: &Path, slug: Option<&str>) -> Result<Option<Worke
     let env_filter = EnvFilter::from_default_env();
 
     if let Some(slug) = slug {
-        let log_path = build_log_path(repo_path, slug);
-        let log_dir = log_path
-            .parent()
-            .expect("log path always has a parent directory");
-
-        fs::create_dir_all(log_dir)
-            .with_context(|| format!("failed to create log directory: {}", log_dir.display()))?;
-
-        let log_file = fs::File::create(&log_path)
-            .with_context(|| format!("failed to create log file: {}", log_path.display()))?;
-
-        let (non_blocking, guard) = tracing_appender::non_blocking(log_file);
+        let (non_blocking, guard) = open_log_writer(repo_path, slug)?;
 
         tracing_subscriber::registry()
             .with(
@@ -65,6 +54,33 @@ pub fn init_tracing(repo_path: &Path, slug: Option<&str>) -> Result<Option<Worke
 
         Ok(None)
     }
+}
+
+/// Create the log directory and file, returning a non-blocking writer and guard.
+///
+/// Builds the log path as `.gba/logs/<slug>/<YYYYMMDD_HHMMSS>.log`, creates
+/// the parent directories, opens the file, and wraps it in a non-blocking
+/// writer via `tracing_appender`.
+fn open_log_writer(
+    repo_path: &Path,
+    slug: &str,
+) -> Result<(tracing_appender::non_blocking::NonBlocking, WorkerGuard)> {
+    let log_path = build_log_path(repo_path, slug);
+
+    // build_log_path always produces a path with a parent directory
+    // (`.gba/logs/<slug>/`), so this branch is unreachable in practice.
+    let log_dir = log_path.parent().context(format!(
+        "failed to resolve parent directory for log path: {}",
+        log_path.display(),
+    ))?;
+
+    fs::create_dir_all(log_dir)
+        .with_context(|| format!("failed to create log directory: {}", log_dir.display()))?;
+
+    let log_file = fs::File::create(&log_path)
+        .with_context(|| format!("failed to create log file: {}", log_path.display()))?;
+
+    Ok(tracing_appender::non_blocking(log_file))
 }
 
 /// Remove log files older than 3 days from `.gba/logs/`.
@@ -333,5 +349,42 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         // Should not panic or error when logs directory doesn't exist.
         cleanup_old_logs(tmp.path());
+    }
+
+    #[test]
+    fn test_should_create_log_dir_and_file_for_slug() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (_non_blocking, _guard) = open_log_writer(tmp.path(), "my-feature").unwrap();
+
+        let logs_dir = tmp.path().join(".gba").join("logs").join("my-feature");
+        assert!(logs_dir.is_dir(), "log directory should be created");
+
+        let entries: Vec<_> = fs::read_dir(&logs_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(entries.len(), 1, "exactly one log file should be created");
+
+        let log_file = entries[0].path();
+        assert_eq!(
+            log_file.extension().and_then(|e| e.to_str()),
+            Some("log"),
+            "log file should have .log extension",
+        );
+
+        // Filename should match YYYYMMDD_HHMMSS format.
+        let stem = log_file.file_stem().unwrap().to_string_lossy();
+        assert_eq!(stem.len(), 15);
+        assert_eq!(&stem[8..9], "_");
+    }
+
+    #[test]
+    fn test_should_return_error_for_invalid_repo_path() {
+        // A path that cannot be created (e.g., under /dev/null).
+        let result = open_log_writer(Path::new("/dev/null"), "test-slug");
+        assert!(
+            result.is_err(),
+            "should fail when directory cannot be created"
+        );
     }
 }
