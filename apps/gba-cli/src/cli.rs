@@ -54,6 +54,18 @@ pub enum Commands {
 }
 
 impl Cli {
+    /// Extract the repo path and optional slug for logging setup.
+    ///
+    /// Returns `(repo_path, Some(slug))` for `plan` and `run` commands,
+    /// and `(repo_path, None)` for `init`.
+    pub fn log_context(&self) -> (PathBuf, Option<String>) {
+        match &self.command {
+            Commands::Init { repo } => (repo.clone(), None),
+            Commands::Plan { slug, repo, .. } => (repo.clone(), Some(slug.clone())),
+            Commands::Run { slug, repo, .. } => (repo.clone(), Some(slug.clone())),
+        }
+    }
+
     /// Execute the selected CLI command.
     ///
     /// Dispatches to the appropriate engine workflow (init, plan, or run)
