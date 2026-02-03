@@ -31,6 +31,7 @@ minijinja = { version = "2.15.1", features = ["loader"] }
 # serialization
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+serde_yaml = "0.9.34"
 
 # error handling
 anyhow = "1.0.100"
@@ -42,3 +43,9 @@ typed-builder = "0.23.2"
 # logging
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+
+# async utilities
+futures = "0.3"
+
+# testing
+tempfile = "3.19.1"
