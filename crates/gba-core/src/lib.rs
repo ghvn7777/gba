@@ -17,11 +17,12 @@ mod engine;
 mod error;
 #[allow(dead_code)]
 mod events;
+mod init;
 #[allow(dead_code)]
 mod spec;
 
 // Internal modules (not re-exported).
-// Allow dead_code: these are foundational infrastructure used in Phases 3-5.
+// Allow dead_code: these are foundational infrastructure used in Phases 4-5.
 #[allow(dead_code)]
 mod agent;
 #[allow(dead_code)]

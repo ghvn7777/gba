@@ -95,15 +95,9 @@ impl Engine {
     /// Returns `CoreError::AlreadyInitialized` if `.gba/` already exists.
     /// Returns `CoreError::Agent` if the init agent fails.
     /// Returns `CoreError::Io` if directory creation fails.
+    #[instrument(skip(self))]
     pub async fn init(&self) -> Result<(), CoreError> {
-        // Stub: will be implemented in Phase 3.
-        let gba_dir = self.config.gba_dir();
-        if gba_dir.exists() {
-            return Err(CoreError::AlreadyInitialized);
-        }
-        Err(CoreError::Agent(
-            "init workflow not yet implemented".to_owned(),
-        ))
+        crate::init::run_init(self).await
     }
 
     /// Start an interactive planning session for a feature.
