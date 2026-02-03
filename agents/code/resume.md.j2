@@ -1,0 +1,25 @@
+Resume implementation from **Phase {{ phase_index }}/{{ total_phases }}: {{ phase.name }}**
+
+A previous run was interrupted. The following phases have already been completed:
+
+{% for cp in completed_phases %}- **Phase {{ cp.index }}**: {{ cp.name }} (commit: `{{ cp.commit }}`)
+{% endfor %}
+
+## Current Phase
+
+**{{ phase.name }}**
+
+{{ phase.description }}
+
+## Tasks
+
+{% for task in phase.tasks %}- {{ task }}
+{% endfor %}
+
+## Instructions
+
+1. Review the work already committed in previous phases before starting.
+2. Do NOT redo or modify completed phases. Build on top of them.
+3. Implement the tasks for the current phase.
+4. Ensure the code compiles and existing tests still pass.
+5. Continue with remaining phases after this one is complete.

@@ -1,0 +1,18 @@
+Implement **Phase {{ phase_index }}/{{ total_phases }}: {{ phase.name }}**
+
+## Description
+
+{{ phase.description }}
+
+## Tasks
+
+{% for task in phase.tasks %}- {{ task }}
+{% endfor %}
+
+## Instructions
+
+1. Read the relevant existing source files before making changes.
+2. Implement each task listed above in order.
+3. Ensure the code compiles and existing tests still pass.
+4. Write tests for the new functionality where appropriate.
+5. Do not modify code unrelated to this phase.

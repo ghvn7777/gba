@@ -1,0 +1,21 @@
+Verify the implementation of feature **{{ feature_slug }}** against its acceptance criteria.
+
+## Design Specification
+
+{{ design_spec }}
+
+## Acceptance Criteria
+
+{% for criterion in criteria %}- {{ criterion }}
+{% endfor %}
+
+## Test Commands
+
+Run each of the following commands and report results:
+
+{% for cmd in test_commands %}```
+{{ cmd }}
+```
+{% endfor %}
+
+Execute each test command, check the output against the acceptance criteria, and report the results.

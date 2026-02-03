@@ -1,0 +1,12 @@
+The code review found the following issues. Fix each one.
+
+{% for issue in issues %}- **[{{ issue.severity }}]** `{{ issue.file }}`: {{ issue.description }}
+{% endfor %}
+
+## Instructions
+
+1. Address each issue listed above.
+2. For **error** severity: these must be fixed.
+3. For **warning** severity: fix unless you have a strong reason not to (explain why).
+4. For **suggestion** severity: apply if straightforward, skip if it requires significant changes.
+5. Ensure the code still compiles and tests pass after fixes.

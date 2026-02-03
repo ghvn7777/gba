@@ -1,0 +1,18 @@
+Review the following code changes for feature **{{ feature_slug }}**.
+
+## Design Specification
+
+{{ design_spec }}
+
+## Verification Criteria
+
+{% for criterion in verification_criteria %}- {{ criterion }}
+{% endfor %}
+
+## Changes (diff)
+
+```diff
+{{ diff }}
+```
+
+Review these changes against the design specification and verification criteria. Report any issues found.

@@ -1,0 +1,25 @@
+Verification failed. Fix the following issues so that all acceptance criteria pass.
+
+## Failures
+
+{% for failure in failures %}- **{{ failure.criterion }}**
+  Status: FAIL
+  Details:
+  ```
+  {{ failure.details }}
+  ```
+{% endfor %}
+
+## Test Output
+
+```
+{{ output }}
+```
+
+## Instructions
+
+1. Analyze each failure and identify the root cause.
+2. Fix the code to make the failing criteria pass.
+3. Do NOT change the test commands or acceptance criteria.
+4. Ensure previously passing criteria still pass after your fixes.
+5. Run the test commands to confirm the fix before finishing.

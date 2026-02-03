@@ -1,0 +1,35 @@
+Initialize this repository for GBA.
+
+## Current Directory Tree
+
+```
+{{ repo_tree }}
+```
+
+## Steps
+
+1. Analyze the repository structure, identifying:
+   - Programming languages and frameworks used
+   - Build system and toolchain
+   - Project layout conventions (monorepo, workspace, etc.)
+   - Key modules and their responsibilities
+   - Entry points and public APIs
+   - Testing patterns
+
+2. Create a single `.gba.md` file at the project root containing:
+   - A one-paragraph project overview
+   - Directory structure with brief descriptions of each key directory
+   - Languages, frameworks, and build tools used
+   - Key modules, types, traits, and interfaces
+   - Conventions and patterns used in the codebase
+   - Entry points and public APIs
+
+3. Update `CLAUDE.md` at the repository root:
+   - Add a "## Project Context" section if it does not already exist
+   - Add a reference to `.gba.md` (e.g., "See `.gba.md` for a codebase overview.")
+
+4. Create the `.gba/` directory with an initial `config.yaml`.
+
+5. Create the `.trees/` directory and add `.trees/` to `.gitignore` if not already present.
+
+Focus on directories that contain source code and configuration. Skip generated output directories (e.g., `target/`, `node_modules/`, `dist/`).
