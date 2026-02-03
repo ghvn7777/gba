@@ -29,31 +29,47 @@ const LOG_RETENTION_DAYS: u64 = 3;
 /// Returns an error if the log directory cannot be created or the
 /// log file cannot be opened.
 pub fn init_tracing(repo_path: &Path, slug: Option<&str>) -> Result<Option<WorkerGuard>> {
-    let env_filter = EnvFilter::from_default_env();
+    let guard = build_tracing(repo_path, slug)?;
 
-    if let Some(slug) = slug {
-        let (non_blocking, guard) = open_log_writer(repo_path, slug)?;
-
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .with_writer(std::io::stderr)
-                    .with_filter(env_filter),
-            )
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .json()
-                    .with_writer(non_blocking)
-                    .with_filter(EnvFilter::from_default_env()),
-            )
-            .init();
-
+    if let Some((subscriber, guard)) = guard {
+        subscriber.init();
         Ok(Some(guard))
     } else {
-        tracing_subscriber::fmt().with_env_filter(env_filter).init();
-
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .init();
         Ok(None)
     }
+}
+
+/// Build the tracing subscriber layers without registering globally.
+///
+/// Returns `Some((subscriber, guard))` when a slug is provided (dual-layer),
+/// or `None` when only stderr logging is needed.
+fn build_tracing(
+    repo_path: &Path,
+    slug: Option<&str>,
+) -> Result<Option<(impl tracing::Subscriber + Send + Sync, WorkerGuard)>> {
+    let Some(slug) = slug else {
+        return Ok(None);
+    };
+
+    let (non_blocking, guard) = open_log_writer(repo_path, slug)?;
+
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(std::io::stderr)
+                .with_filter(EnvFilter::from_default_env()),
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .json()
+                .with_writer(non_blocking)
+                .with_filter(EnvFilter::from_default_env()),
+        );
+
+    Ok(Some((subscriber, guard)))
 }
 
 /// Create the log directory and file, returning a non-blocking writer and guard.
@@ -385,6 +401,16 @@ mod tests {
         assert!(
             result.is_err(),
             "should fail when directory cannot be created"
+        );
+    }
+
+    #[test]
+    fn test_should_return_none_guard_when_no_slug() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = build_tracing(tmp.path(), None).unwrap();
+        assert!(
+            result.is_none(),
+            "should return None when no slug is provided",
         );
     }
 }
