@@ -27,6 +27,8 @@ pub(crate) struct AgentRunner {
     /// Resolved model name (CLI override > project config > SDK default).
     model: Option<String>,
     /// Resolved max tokens (CLI override > project config).
+    /// Retained for future use when agent token limits are enforced.
+    #[allow(dead_code)]
     max_tokens: Option<u32>,
     /// Permission mode from project config.
     permission_mode: PermissionMode,
@@ -115,6 +117,7 @@ impl AgentRunner {
     ///
     /// Returns `CoreError::Prompt` if template rendering fails.
     /// Returns `CoreError::Agent` if the SDK query fails.
+    #[allow(dead_code)]
     #[instrument(skip(self, context, callback))]
     pub(crate) async fn run_agent_stream(
         &self,
@@ -156,6 +159,7 @@ impl AgentRunner {
     }
 
     /// Returns a reference to the internal prompt manager.
+    #[allow(dead_code)]
     pub(crate) fn prompt_manager(&self) -> &gba_pm::PromptManager {
         &self.prompt_manager
     }

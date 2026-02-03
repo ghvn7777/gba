@@ -15,7 +15,7 @@ use crate::error::CoreError;
 /// Encapsulates the repository path and git configuration to provide
 /// a consistent interface for worktree creation, branching, committing,
 /// and diffing.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct GitOps {
     /// Path to the main repository.
     repo_path: PathBuf,
@@ -190,6 +190,7 @@ impl GitOps {
     /// # Errors
     ///
     /// Returns `CoreError::Git` if the git command fails.
+    #[allow(dead_code)]
     #[instrument(skip(self))]
     pub(crate) async fn current_branch(&self, worktree: &Path) -> Result<String, CoreError> {
         let output = tokio::process::Command::new("git")

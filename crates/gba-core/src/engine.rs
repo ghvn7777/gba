@@ -5,6 +5,7 @@
 //! for the init, plan, and run workflows.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tracing::{info, instrument};
 
@@ -43,12 +44,10 @@ pub struct Engine {
     /// Project-level configuration from `.gba/config.yaml`.
     project_config: ProjectConfig,
     /// Agent session runner (wraps Claude SDK).
-    /// Used in Phases 3-5 when init/plan/run workflows are implemented.
-    #[allow(dead_code)]
-    agent_runner: AgentRunner,
+    /// Wrapped in `Arc` so it can be shared with spawned background tasks
+    /// (e.g., the run workflow's phase execution task).
+    agent_runner: Arc<AgentRunner>,
     /// Git operations helper.
-    /// Used in Phases 3-5 when init/plan/run workflows are implemented.
-    #[allow(dead_code)]
     git: GitOps,
 }
 
@@ -79,7 +78,7 @@ impl Engine {
         Ok(Self {
             config,
             project_config,
-            agent_runner,
+            agent_runner: Arc::new(agent_runner),
             git,
         })
     }
@@ -126,17 +125,9 @@ impl Engine {
     ///
     /// Returns `CoreError::NotInitialized` if the repo is not initialized.
     /// Returns `CoreError::FeatureNotFound` if the feature spec doesn't exist.
+    #[instrument(skip(self))]
     pub async fn run(&self, slug: &str) -> Result<RunStream, CoreError> {
-        // Verify initialized
-        if !self.config.gba_dir().exists() {
-            return Err(CoreError::NotInitialized);
-        }
-
-        // Stub: will be implemented in Phase 5.
-        let _ = slug;
-        Err(CoreError::Agent(
-            "run workflow not yet implemented".to_owned(),
-        ))
+        crate::run::run_execution(self, slug).await
     }
 
     /// Returns a reference to the engine configuration.
@@ -150,17 +141,18 @@ impl Engine {
     }
 
     /// Returns a reference to the internal git operations helper.
-    /// Used in Phases 3-5.
-    #[allow(dead_code)]
     pub(crate) fn git(&self) -> &GitOps {
         &self.git
     }
 
     /// Returns a reference to the internal agent runner.
-    /// Used in Phases 3-5.
-    #[allow(dead_code)]
     pub(crate) fn agent_runner(&self) -> &AgentRunner {
         &self.agent_runner
+    }
+
+    /// Returns an Arc clone of the agent runner for sharing with spawned tasks.
+    pub(crate) fn agent_runner_arc(&self) -> Arc<AgentRunner> {
+        Arc::clone(&self.agent_runner)
     }
 
     /// Returns the `.gba` directory path.

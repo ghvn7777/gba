@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tracing::info;
 
-use gba_core::{Engine, EngineConfig};
+use gba_core::{Engine, EngineConfig, RunEvent};
 
 /// CLI entry point for GBA -- Claude Agent powered repo automation.
 #[derive(Debug, Parser)]
@@ -80,15 +80,60 @@ impl Cli {
                 let engine = Engine::new(config)
                     .await
                     .context("failed to create engine")?;
-                let _stream = engine
+                let mut stream = engine
                     .run(&slug)
                     .await
                     .context("failed to start run stream")?;
-                // Run workflow will be implemented in Phase 5.
-                println!("Run started for '{slug}'. (Phase 5 implementation pending)");
+
+                while let Some(event) = stream.next().await {
+                    display_run_event(&event);
+                }
+
                 Ok(())
             }
         }
+    }
+}
+
+/// Display a single run event to stdout.
+///
+/// Formats each event variant with a prefix indicator:
+/// - `[~]` for in-progress steps
+/// - `[x]` for completed steps
+/// - `[!]` for warnings/failures
+fn display_run_event(event: &RunEvent) {
+    match event {
+        RunEvent::Started {
+            feature,
+            total_phases,
+        } => {
+            println!("Running feature: {feature} ({total_phases} phases)");
+        }
+        RunEvent::PhaseStarted { index, name } => {
+            println!("[~] Phase {}: {name}", index + 1);
+        }
+        RunEvent::CodingOutput(text) => {
+            print!("{text}");
+        }
+        RunEvent::HookResult { hook, passed } => {
+            let indicator = if *passed { "x" } else { "!" };
+            println!("[{indicator}] Hook: {hook}");
+        }
+        RunEvent::PhaseCommitted { index, commit_hash } => {
+            println!("[x] Phase {} committed: {commit_hash}", index + 1);
+        }
+        RunEvent::ReviewStarted => println!("[~] Code review..."),
+        RunEvent::ReviewCompleted { issues } => {
+            println!("[x] Code review completed ({} issues)", issues.len());
+        }
+        RunEvent::VerificationStarted => println!("[~] Verification..."),
+        RunEvent::VerificationCompleted { passed, details } => {
+            let indicator = if *passed { "x" } else { "!" };
+            println!("[{indicator}] Verification: {details}");
+        }
+        RunEvent::PrCreated { url } => println!("[x] PR created: {url}"),
+        RunEvent::Finished => println!("\nDone!"),
+        RunEvent::Error(e) => eprintln!("[!] Error: {e}"),
     }
 }
 

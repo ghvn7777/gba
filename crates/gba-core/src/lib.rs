@@ -15,20 +15,15 @@
 mod config;
 mod engine;
 mod error;
-#[allow(dead_code)]
 mod events;
 mod init;
 mod plan;
-#[allow(dead_code)]
+mod run;
 mod spec;
 
 // Internal modules (not re-exported).
-// Allow dead_code: these are foundational infrastructure used in Phases 4-5.
-#[allow(dead_code)]
 mod agent;
-#[allow(dead_code)]
 mod git;
-#[allow(dead_code)]
 mod hooks;
 
 // ── Public re-exports ────────────────────────────────────────

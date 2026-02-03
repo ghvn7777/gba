@@ -244,6 +244,7 @@ pub(crate) fn load_design_spec(gba_dir: &Path, slug: &str) -> Result<String, Cor
 ///
 /// Returns `CoreError::FeatureNotFound` if the file does not exist.
 /// Returns `CoreError::Io` if the file cannot be read.
+#[allow(dead_code)]
 pub(crate) fn load_verification_spec(gba_dir: &Path, slug: &str) -> Result<String, CoreError> {
     let path = gba_dir
         .join("features")
