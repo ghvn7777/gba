@@ -109,18 +109,12 @@ impl Engine {
     /// # Errors
     ///
     /// Returns `CoreError::NotInitialized` if the repo is not initialized.
+    /// Returns `CoreError::Io` if directory creation fails.
+    /// Returns `CoreError::Git` if worktree creation fails.
     /// Returns `CoreError::Agent` if the planning agent cannot be started.
+    #[instrument(skip(self))]
     pub async fn plan(&self, slug: &str) -> Result<PlanSession, CoreError> {
-        // Verify initialized
-        if !self.config.gba_dir().exists() {
-            return Err(CoreError::NotInitialized);
-        }
-
-        // Stub: will be implemented in Phase 4.
-        let _ = slug;
-        Err(CoreError::Agent(
-            "plan workflow not yet implemented".to_owned(),
-        ))
+        crate::plan::run_plan(self, slug).await
     }
 
     /// Execute a feature's development plan phase by phase.

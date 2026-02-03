@@ -18,6 +18,7 @@ mod error;
 #[allow(dead_code)]
 mod events;
 mod init;
+mod plan;
 #[allow(dead_code)]
 mod spec;
 

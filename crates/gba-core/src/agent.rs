@@ -161,6 +161,40 @@ impl AgentRunner {
     }
 
     /// Build SDK options for an agent session.
+    ///
+    /// This is the public variant of the internal `build_options` method,
+    /// exposed so that the plan workflow can construct `ClaudeAgentOptions`
+    /// for direct use with `ClaudeClient` (bidirectional streaming).
+    ///
+    /// # Errors
+    ///
+    /// Returns `CoreError::Agent` if the agent config cannot be loaded.
+    /// Returns `CoreError::Prompt` if template rendering fails.
+    pub(crate) fn build_agent_options(
+        &self,
+        agent_name: &str,
+        context: &serde_json::Value,
+        cwd: Option<&Path>,
+    ) -> Result<ClaudeAgentOptions, CoreError> {
+        self.build_options(agent_name, context, cwd)
+    }
+
+    /// Render a prompt template with the given context.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CoreError::Prompt` if template rendering fails.
+    pub(crate) fn render_template(
+        &self,
+        template_name: &str,
+        context: &serde_json::Value,
+    ) -> Result<String, CoreError> {
+        self.prompt_manager
+            .render(template_name, context)
+            .map_err(CoreError::from)
+    }
+
+    /// Build SDK options for an agent session.
     fn build_options(
         &self,
         agent_name: &str,
