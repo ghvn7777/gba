@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::engine::Engine;
 use crate::error::CoreError;
@@ -79,11 +79,28 @@ pub(crate) async fn run_init(engine: &Engine) -> Result<(), CoreError> {
         "repo_path": repo_path.display().to_string(),
         "repo_tree": repo_tree,
     });
-    engine
+    match engine
         .agent_runner()
         .run_agent("init", "init/task", &context, Some(&repo_path))
-        .await?;
-    info!("init agent completed");
+        .await
+    {
+        Ok(_) => {
+            info!("init agent completed");
+        }
+        Err(e) => {
+            error!(error = %e, "init agent failed, cleaning up created directories");
+            // Clean up partially created state on agent failure
+            if let Err(cleanup_err) = fs::remove_dir_all(&gba_dir) {
+                warn!(error = %cleanup_err, "failed to clean up .gba directory after init failure");
+            }
+            if trees_dir.exists()
+                && let Err(cleanup_err) = fs::remove_dir_all(&trees_dir)
+            {
+                warn!(error = %cleanup_err, "failed to clean up .trees directory after init failure");
+            }
+            return Err(e);
+        }
+    }
 
     Ok(())
 }

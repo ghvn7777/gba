@@ -190,7 +190,7 @@ impl GitOps {
     /// # Errors
     ///
     /// Returns `CoreError::Git` if the git command fails.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Will be used for branch validation during PR creation
     #[instrument(skip(self))]
     pub(crate) async fn current_branch(&self, worktree: &Path) -> Result<String, CoreError> {
         let output = tokio::process::Command::new("git")

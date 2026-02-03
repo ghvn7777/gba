@@ -155,6 +155,18 @@ impl PromptManager {
     ///
     /// Returns `PmError::TemplateNotFound` if no template with the given name exists.
     /// Returns `PmError::RenderError` if rendering fails (e.g., missing variables).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use gba_pm::PromptManager;
+    /// use serde_json::json;
+    ///
+    /// let pm = PromptManager::new().unwrap();
+    /// let ctx = json!({"repo_path": "/home/user/project"});
+    /// let rendered = pm.render("init/system", &ctx).unwrap();
+    /// assert!(!rendered.is_empty());
+    /// ```
     pub fn render(&self, name: &str, ctx: &serde_json::Value) -> Result<String, PmError> {
         let tmpl = self
             .env
@@ -184,6 +196,15 @@ impl PromptManager {
     ///
     /// Returns `PmError::TemplateNotFound` if no built-in config exists for the agent.
     /// Returns `PmError::ConfigParse` if the YAML content cannot be parsed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use gba_pm::PromptManager;
+    ///
+    /// let config = PromptManager::load_agent_config("init").unwrap();
+    /// assert!(config.preset);
+    /// ```
     pub fn load_agent_config(name: &str) -> Result<AgentConfig, PmError> {
         let yaml_source = BUILT_IN_CONFIGS
             .iter()

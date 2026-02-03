@@ -9,6 +9,7 @@ use std::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use tracing::{debug, instrument};
 
 use crate::error::CoreError;
 
@@ -178,6 +179,7 @@ pub struct VerificationResult {
 /// Returns `CoreError::FeatureNotFound` if the feature directory does not exist.
 /// Returns `CoreError::InvalidSpec` if the YAML content cannot be parsed.
 /// Returns `CoreError::Io` if the file cannot be read.
+#[instrument(skip(gba_dir))]
 pub(crate) fn load_feature_spec(gba_dir: &Path, slug: &str) -> Result<FeatureSpec, CoreError> {
     let phases_path = gba_dir.join("features").join(slug).join("phases.yaml");
     if !phases_path.exists() {
@@ -192,13 +194,15 @@ pub(crate) fn load_feature_spec(gba_dir: &Path, slug: &str) -> Result<FeatureSpe
 /// Save a [`FeatureSpec`] to `phases.yaml` for the given feature slug.
 ///
 /// Writes to `.gba/features/<slug>/phases.yaml`, creating parent directories
-/// as needed.
+/// as needed. This function is called after each phase completes to ensure
+/// that resume information is persisted even if a later step fails.
 ///
 /// # Errors
 ///
 /// Returns `CoreError::Io` if directories cannot be created or the file cannot
 /// be written.
 /// Returns `CoreError::Yaml` if the spec cannot be serialized.
+#[instrument(skip(gba_dir, spec))]
 pub(crate) fn save_feature_spec(
     gba_dir: &Path,
     slug: &str,
@@ -210,6 +214,7 @@ pub(crate) fn save_feature_spec(
     let phases_path = feature_dir.join("phases.yaml");
     let yaml = serde_yaml::to_string(spec)?;
     fs::write(&phases_path, yaml)?;
+    debug!(path = %phases_path.display(), "saved feature spec");
     Ok(())
 }
 
@@ -221,6 +226,7 @@ pub(crate) fn save_feature_spec(
 ///
 /// Returns `CoreError::FeatureNotFound` if the file does not exist.
 /// Returns `CoreError::Io` if the file cannot be read.
+#[instrument(skip(gba_dir))]
 pub(crate) fn load_design_spec(gba_dir: &Path, slug: &str) -> Result<String, CoreError> {
     let path = gba_dir
         .join("features")
@@ -244,7 +250,8 @@ pub(crate) fn load_design_spec(gba_dir: &Path, slug: &str) -> Result<String, Cor
 ///
 /// Returns `CoreError::FeatureNotFound` if the file does not exist.
 /// Returns `CoreError::Io` if the file cannot be read.
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used when verification reads its own spec
+#[instrument(skip(gba_dir))]
 pub(crate) fn load_verification_spec(gba_dir: &Path, slug: &str) -> Result<String, CoreError> {
     let path = gba_dir
         .join("features")

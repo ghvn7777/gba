@@ -1,3 +1,8 @@
+//! CLI command definitions and execution logic.
+//!
+//! Defines the [`Cli`] struct and [`Commands`] enum for the `gba` binary,
+//! then dispatches to the appropriate engine workflow (init, plan, run).
+
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -50,6 +55,14 @@ pub enum Commands {
 
 impl Cli {
     /// Execute the selected CLI command.
+    ///
+    /// Dispatches to the appropriate engine workflow (init, plan, or run)
+    /// based on the parsed subcommand.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if engine creation fails or the selected workflow
+    /// encounters an unrecoverable error.
     pub async fn run(self) -> Result<()> {
         match self.command {
             Commands::Init { repo } => {

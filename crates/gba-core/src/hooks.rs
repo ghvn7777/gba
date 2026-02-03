@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use tracing::{debug, instrument, warn};
+use tracing::{debug, error, instrument, warn};
 
 use crate::config::{Hook, HooksConfig};
 use crate::error::CoreError;
@@ -75,11 +75,23 @@ impl HookRunner {
         for hook in &self.hooks {
             debug!(hook = %hook.name, command = %hook.command, "running hook");
 
-            let output = tokio::process::Command::new("sh")
+            let output = match tokio::process::Command::new("sh")
                 .args(["-c", &hook.command])
                 .current_dir(cwd)
                 .output()
-                .await?;
+                .await
+            {
+                Ok(output) => output,
+                Err(e) => {
+                    error!(
+                        hook = %hook.name,
+                        command = %hook.command,
+                        error = %e,
+                        "failed to spawn hook command"
+                    );
+                    return Err(CoreError::Io(e));
+                }
+            };
 
             let passed = output.status.success();
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();

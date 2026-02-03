@@ -1,3 +1,8 @@
+//! GBA CLI binary entry point.
+//!
+//! Initializes the tracing subscriber, parses command-line arguments with
+//! clap, and dispatches to the selected subcommand via [`Cli::run`].
+
 mod cli;
 mod tui;
 

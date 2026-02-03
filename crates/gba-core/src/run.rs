@@ -7,6 +7,16 @@
 //!
 //! Progress is reported through [`RunEvent`] on a channel consumed by the CLI
 //! via [`RunStream`].
+//!
+//! # Edge cases
+//!
+//! - **Empty phases list**: if `phases.yaml` has no phases, execution skips
+//!   directly to the review/verification steps.
+//! - **Missing verification commands**: verification is skipped when no test
+//!   commands are defined.
+//! - **Missing design spec**: a warning is logged and an empty string is used
+//!   so the coding agent still receives valid context.
+//! - **Resume support**: completed phases are detected and skipped automatically.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -14,7 +24,7 @@ use std::sync::Arc;
 use claude_agent_sdk_rs::{ContentBlock, Message};
 use serde_json::json;
 use tokio::sync::mpsc;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::agent::AgentRunner;
 use crate::config::{HooksConfig, ReviewConfig, VerificationConfig};
@@ -35,6 +45,7 @@ const EVENT_CHANNEL_SIZE: usize = 64;
 ///
 /// Contains all the owned/cloned components the background task needs,
 /// since `Engine` itself cannot be moved into a `tokio::spawn`.
+#[derive(Debug)]
 struct RunContext {
     /// Agent runner, shared via Arc since it is not Clone.
     agent_runner: Arc<AgentRunner>,
@@ -76,8 +87,15 @@ pub(crate) async fn run_execution(engine: &Engine, slug: &str) -> Result<RunStre
     // Load feature spec
     let spec = load_feature_spec(&gba_dir, slug)?;
 
-    // Load design spec for agent context
-    let design_spec = load_design_spec(&gba_dir, slug)?;
+    // Load design spec for agent context (warn but continue if missing)
+    let design_spec = match load_design_spec(&gba_dir, slug) {
+        Ok(content) => content,
+        Err(CoreError::FeatureNotFound(msg)) => {
+            warn!(slug, reason = %msg, "design spec missing, continuing with empty context");
+            String::new()
+        }
+        Err(e) => return Err(e),
+    };
 
     // Ensure worktree exists
     let worktree_path = engine.git().ensure_worktree(slug).await?;
@@ -114,7 +132,9 @@ pub(crate) async fn run_execution(engine: &Engine, slug: &str) -> Result<RunStre
 /// Execute all phases, review, verification, and PR creation in the background.
 ///
 /// Sends [`RunEvent`]s on the channel as each step completes. If any step
-/// fails, sends a [`RunEvent::Error`] and returns.
+/// fails, sends a [`RunEvent::Error`] and returns. The spec is saved after
+/// each phase so that a resume picks up where execution left off.
+#[instrument(skip_all, fields(slug = %slug, total_phases = spec.phases.len()))]
 async fn execute_phases(
     ctx: RunContext,
     slug: String,
@@ -140,6 +160,11 @@ async fn execute_phases(
 
     let worktree_path = ctx.git.worktree_path(&slug);
     let mut total_turns: u32 = 0;
+
+    // Handle empty phases list -- skip directly to review/verification
+    if total_phases == 0 {
+        info!(slug = %slug, "no phases defined, skipping to review/verification");
+    }
 
     // ── Phase Execution ──────────────────────────────────────────
     let completed_phases = collect_completed_phases(&spec);
@@ -183,6 +208,15 @@ async fn execute_phases(
         let turns = match agent_result {
             Ok(t) => t,
             Err(e) => {
+                // Save spec on failure so resume picks up here
+                spec.phases[index].result = Some(PhaseResult {
+                    status: StepStatus::Failed,
+                    turns: 0,
+                    commit: None,
+                });
+                if let Err(save_err) = save_feature_spec(&ctx.gba_dir, &slug, &spec) {
+                    warn!(error = %save_err, "failed to save spec after phase failure");
+                }
                 let _ = send_event(&event_tx, RunEvent::Error(e)).await;
                 return;
             }
@@ -285,7 +319,14 @@ async fn execute_phases(
     };
 
     // ── Verification ─────────────────────────────────────────────
-    let verification_result = if ctx.verification_config.enabled {
+    // Skip verification when no test commands are defined
+    let skip_verification =
+        spec.verification.test_commands.is_empty() && spec.verification.criteria.is_empty();
+    if skip_verification {
+        debug!("no verification commands or criteria defined, skipping verification step");
+    }
+
+    let verification_result = if ctx.verification_config.enabled && !skip_verification {
         if send_event(&event_tx, RunEvent::VerificationStarted)
             .await
             .is_err()
@@ -387,6 +428,7 @@ fn collect_completed_phases(spec: &FeatureSpec) -> Vec<serde_json::Value> {
 }
 
 /// Context for a single coding phase execution.
+#[derive(Debug)]
 struct PhaseContext<'a> {
     /// Feature slug.
     slug: &'a str,
@@ -506,6 +548,11 @@ async fn run_hooks_cycle(
                 .filter(|r| !r.passed)
                 .map(|r| r.name.as_str())
                 .collect();
+            error!(
+                failed_hooks = ?failed_hooks,
+                max_retries,
+                "hooks failed after exhausting retries"
+            );
             return Err(CoreError::Hook(format!(
                 "hooks failed after {} retries: {}",
                 max_retries,

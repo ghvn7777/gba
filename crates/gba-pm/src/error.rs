@@ -1,4 +1,8 @@
 //! Error types for the prompt manager crate.
+//!
+//! All fallible operations in `gba-pm` return `Result<T, PmError>`.
+//! Each variant represents a distinct failure domain for targeted error
+//! handling by callers.
 
 use thiserror::Error;
 

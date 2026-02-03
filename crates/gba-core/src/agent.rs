@@ -10,7 +10,7 @@ use claude_agent_sdk_rs::{
     ClaudeAgentOptions, Message, PermissionMode as SdkPermissionMode, ResultMessage, SystemPrompt,
     SystemPromptPreset, Tools,
 };
-use tracing::{debug, instrument};
+use tracing::{debug, error, instrument};
 
 use crate::config::{EngineConfig, PermissionMode, ProjectConfig};
 use crate::error::CoreError;
@@ -27,8 +27,7 @@ pub(crate) struct AgentRunner {
     /// Resolved model name (CLI override > project config > SDK default).
     model: Option<String>,
     /// Resolved max tokens (CLI override > project config).
-    /// Retained for future use when agent token limits are enforced.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Retained for future use when agent token limits are enforced
     max_tokens: Option<u32>,
     /// Permission mode from project config.
     permission_mode: PermissionMode,
@@ -103,7 +102,12 @@ impl AgentRunner {
 
         let messages = claude_agent_sdk_rs::query(&task_prompt, Some(options))
             .await
-            .map_err(|e| CoreError::Agent(format!("agent {agent_name} failed: {e}")))?;
+            .map_err(|e| {
+                error!(agent = agent_name, error = %e, "agent query failed");
+                CoreError::Agent(format!(
+                    "agent {agent_name} failed: {e}. Check your network connection and API credentials."
+                ))
+            })?;
 
         Ok(messages)
     }
@@ -117,7 +121,7 @@ impl AgentRunner {
     ///
     /// Returns `CoreError::Prompt` if template rendering fails.
     /// Returns `CoreError::Agent` if the SDK query fails.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Will be used for real-time streaming output in run workflow
     #[instrument(skip(self, context, callback))]
     pub(crate) async fn run_agent_stream(
         &self,
@@ -138,7 +142,12 @@ impl AgentRunner {
 
         let mut stream = claude_agent_sdk_rs::query_stream(&task_prompt, Some(options))
             .await
-            .map_err(|e| CoreError::Agent(format!("agent {agent_name} stream failed: {e}")))?;
+            .map_err(|e| {
+                error!(agent = agent_name, error = %e, "agent stream failed");
+                CoreError::Agent(format!(
+                    "agent {agent_name} stream failed: {e}. Check your network connection and API credentials."
+                ))
+            })?;
 
         use futures::StreamExt as _;
         let mut result_msg: Option<ResultMessage> = None;
@@ -159,7 +168,7 @@ impl AgentRunner {
     }
 
     /// Returns a reference to the internal prompt manager.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used in tests and will be used for template introspection
     pub(crate) fn prompt_manager(&self) -> &gba_pm::PromptManager {
         &self.prompt_manager
     }

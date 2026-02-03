@@ -1,4 +1,7 @@
 //! Template and agent configuration types used by the prompt manager.
+//!
+//! Defines [`PromptTemplate`] for representing template sources and
+//! [`AgentConfig`] for agent-level settings parsed from `config.yml` files.
 
 use serde::{Deserialize, Serialize};
 

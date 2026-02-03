@@ -12,7 +12,7 @@ use claude_agent_sdk_rs::{ClaudeClient, ContentBlock, Message};
 use futures::StreamExt as _;
 use serde_json::json;
 use tokio::sync::mpsc;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::engine::Engine;
 use crate::error::CoreError;
@@ -106,6 +106,7 @@ pub(crate) async fn run_plan(engine: &Engine, slug: &str) -> Result<PlanSession,
 /// a loop: receive agent messages, emit events, wait for user input, and
 /// send the next query. The loop terminates when the user closes the input
 /// channel or the agent signals completion.
+#[instrument(skip_all)]
 async fn run_plan_session(
     options: claude_agent_sdk_rs::ClaudeAgentOptions,
     task_prompt: String,
@@ -116,9 +117,10 @@ async fn run_plan_session(
     // Connect the ClaudeClient
     let mut client = ClaudeClient::new(options);
     if let Err(e) = client.connect().await {
+        error!(error = %e, "failed to connect plan agent");
         let _ = event_tx
             .send(PlanEvent::Error(CoreError::Agent(format!(
-                "failed to connect plan agent: {e}"
+                "failed to connect plan agent: {e}. Check your network connection and API credentials."
             ))))
             .await;
         return;
@@ -127,6 +129,7 @@ async fn run_plan_session(
 
     // Send the initial task prompt
     if let Err(e) = client.query(&task_prompt).await {
+        error!(error = %e, "failed to send initial query to plan agent");
         let _ = event_tx
             .send(PlanEvent::Error(CoreError::Agent(format!(
                 "failed to send initial query: {e}"
@@ -196,11 +199,12 @@ async fn run_plan_session(
 }
 
 /// Outcome of receiving a single agent turn.
-#[allow(dead_code)]
+#[derive(Debug)]
 enum TurnOutcome {
     /// Agent finished speaking and is waiting for user input.
     WaitingForInput,
     /// The conversation completed successfully.
+    #[allow(dead_code)] // Variant exists for protocol completeness
     Completed,
     /// The message stream ended (connection closed).
     StreamEnded,
