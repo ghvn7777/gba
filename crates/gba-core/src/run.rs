@@ -888,8 +888,9 @@ fn extract_turn_count(messages: &[Message]) -> u32 {
 
 /// Check whether verification passed based on agent output.
 ///
-/// Looks at the Result message's `is_error` field and scans the text
-/// output for failure indicators.
+/// First checks the Result message's `is_error` field, then looks for
+/// the structured `verdict: pass|fail` output format defined in the
+/// verify agent's system template.
 fn check_verification_passed(messages: &[Message], output: &str) -> bool {
     // Check if the result message indicates an error
     for msg in messages {
@@ -900,12 +901,21 @@ fn check_verification_passed(messages: &[Message], output: &str) -> bool {
         }
     }
 
-    // Heuristic: check for failure keywords in the output
+    // Parse structured verdict from the verify agent's output format:
+    //   verdict: pass|fail
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if let Some(verdict) = trimmed.strip_prefix("verdict:") {
+            let verdict = verdict.trim().to_lowercase();
+            return verdict == "pass";
+        }
+    }
+
+    // Fallback: if no structured verdict found, check for failure indicators
     let lower = output.to_lowercase();
     let has_fail = lower.contains("fail") || lower.contains("error");
     let has_pass = lower.contains("pass") || lower.contains("success");
 
-    // If both or neither, default to checking if no explicit failure
     if has_fail && !has_pass {
         return false;
     }
@@ -1314,6 +1324,18 @@ Done.
 
         let ambiguous_output = "Tests passed with some warnings.";
         assert!(check_verification_passed(&[], ambiguous_output));
+    }
+
+    #[test]
+    fn test_should_parse_structured_verdict_pass() {
+        let output = "- criterion: \"All tests pass\"\n  status: pass\n  details: \"OK\"\n\nverdict: pass\nsummary: \"All criteria met\"";
+        assert!(check_verification_passed(&[], output));
+    }
+
+    #[test]
+    fn test_should_parse_structured_verdict_fail() {
+        let output = "- criterion: \"All tests pass\"\n  status: fail\n  details: \"2 tests failed\"\n\nverdict: fail\nsummary: \"Not all criteria met\"";
+        assert!(!check_verification_passed(&[], output));
     }
 
     #[test]
