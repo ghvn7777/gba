@@ -1,3 +1,7 @@
+## Project Context
+
+See [`.gba.md`](.gba.md) for a comprehensive codebase overview including project structure, key modules, frameworks, conventions, and public APIs.
+
 # Rust Guidelines
 ## Toolchain & Build
 

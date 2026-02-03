@@ -1,0 +1,24 @@
+# GBA Configuration
+# See documentation for all available options.
+
+agent:
+  # model: claude-sonnet-4-20250514
+  # maxTokens: 16384
+  permissionMode: auto
+
+git:
+  autoCommit: true
+  branchPattern: "feat/{id}-{slug}"
+  baseBranch: main
+
+review:
+  enabled: true
+  maxIterations: 3
+
+verification:
+  enabled: true
+  maxIterations: 3
+
+hooks:
+  preCommit: []
+  maxRetries: 5

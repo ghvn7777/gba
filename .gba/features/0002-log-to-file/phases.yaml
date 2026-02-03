@@ -1,0 +1,79 @@
+feature: 'Dual-output tracing: human-readable stderr + JSON log file with 3-day auto-cleanup'
+phases:
+- name: 'Phase 1: Add tracing-appender dependency and logging module skeleton'
+  description: |
+    Add tracing-appender to workspace and gba-cli dependencies. Create the logging module with function signatures and the log path generation logic. Wire up the module in main.rs but keep existing tracing behavior unchanged (file layer not yet connected).
+  tasks:
+  - Add tracing-appender = "0.2" to [workspace.dependencies] in root Cargo.toml
+  - Add tracing-appender = { workspace = true } to apps/gba-cli/Cargo.toml dependencies
+  - Create apps/gba-cli/src/logging.rs with pub fn init_tracing(repo_path, slug) -> Result<Option<WorkerGuard>> and pub fn cleanup_old_logs(repo_path)
+  - 'Implement log file path generation: .gba/logs/<slug>/<YYYYMMDD_HHMMSS>.log using UTC time'
+  - Add mod logging to apps/gba-cli/src/main.rs
+  - Add log_context() method to Cli that returns (PathBuf, Option<String>) extracting repo and slug from the parsed command
+  - Run cargo build, cargo test, cargo clippy -- -D warnings, cargo +nightly fmt
+  result:
+    status: completed
+    turns: 40
+    commit: eeccc8a
+- name: 'Phase 2: Implement dual-layer tracing initialization'
+  description: |
+    Implement init_tracing to compose a stderr layer (human-readable) and an optional JSON file layer using tracing-subscriber's Layer trait. Update main.rs to call init_tracing and hold the WorkerGuard.
+  tasks:
+  - 'Implement init_tracing: create the stderr fmt layer with EnvFilter (human-readable format)'
+  - When slug is Some, create .gba/logs/<slug>/ directory, open the log file, wrap in tracing_appender::non_blocking, create JSON fmt layer with EnvFilter
+  - Compose layers using tracing_subscriber::registry().with(stderr_layer).with(file_layer) and call .init()
+  - Return Ok(Some(guard)) when file layer is active, Ok(None) when only stderr
+  - 'Update main.rs: parse Cli, extract log_context(), call init_tracing(), hold _guard, then call cli.run().await'
+  - Remove the old tracing_subscriber::fmt().with_env_filter().init() from main.rs
+  - Run cargo build, cargo test, cargo clippy -- -D warnings, cargo +nightly fmt
+  result:
+    status: completed
+    turns: 32
+    commit: '30569e4'
+- name: 'Phase 3: Implement log cleanup and add tests'
+  description: |
+    Implement the 3-day cleanup logic in cleanup_old_logs. Wire it into main.rs to run on every command startup before tracing init. Add unit tests for path generation, cleanup behavior, and edge cases.
+  tasks:
+  - 'Implement cleanup_old_logs: walk .gba/logs/ recursively, delete .log files with modified time > 3 days, remove empty subdirectories'
+  - Use eprintln! for cleanup warnings since tracing may not be initialized yet
+  - Call cleanup_old_logs in main.rs before init_tracing
+  - 'Add unit test: test_should_generate_correct_log_file_path'
+  - 'Add unit test: test_should_cleanup_old_log_files (using tempfile, filetime crate to set old mtime)'
+  - 'Add unit test: test_should_remove_empty_dirs_after_cleanup'
+  - 'Add unit test: test_should_not_fail_on_missing_logs_dir'
+  - 'Add unit test: test_should_return_none_guard_when_no_slug'
+  - Add filetime = "0.2" to [workspace.dependencies] and gba-cli dev-dependencies for tests that need to set file modified times
+  - Run cargo build, cargo test, cargo clippy -- -D warnings, cargo +nightly fmt
+  result:
+    status: completed
+    turns: 30
+    commit: 80a3f51
+verification:
+  criteria:
+  - gba plan <slug> creates a JSON log file at .gba/logs/<slug>/<timestamp>.log
+  - gba run <slug> creates a JSON log file at .gba/logs/<slug>/<timestamp>.log
+  - gba init does NOT create a log file
+  - stderr output remains human-readable for all commands
+  - Each line in the log file is valid JSON
+  - Log files older than 3 days are deleted on startup
+  - Empty log subdirectories are removed after cleanup
+  - RUST_LOG env var controls both stderr and file layer verbosity
+  - 'All tests pass: cargo test'
+  - 'No clippy warnings: cargo clippy -- -D warnings'
+  - 'Formatted: cargo +nightly fmt -- --check'
+  testCommands:
+  - cargo build
+  - cargo test
+  - cargo clippy -- -D warnings
+  - cargo +nightly fmt -- --check
+execution:
+  status: completed
+  totalTurns: 132
+  review:
+    turns: 16
+    issuesFound: 0
+    issuesFixed: 0
+  verification:
+    turns: 14
+    passed: true
+  pr: https://github.com/ghvn7777/gba/pull/2

@@ -25,3 +25,4 @@ target/
 .env.local
 
 .trees/
+.gba/logs
