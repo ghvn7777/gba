@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
 use crate::agent::AgentRunner;
 use crate::config::{EngineConfig, ProjectConfig, load_project_config};
@@ -105,6 +105,10 @@ impl Engine {
     /// the planning agent. The CLI drives the conversation by calling
     /// `next()` and `respond()` on the session.
     ///
+    /// The slug is normalized before use: common branch prefixes (`feat/`,
+    /// `feature/`) are stripped, and any remaining `/` characters are replaced
+    /// with `_`.
+    ///
     /// # Errors
     ///
     /// Returns `CoreError::NotInitialized` if the repo is not initialized.
@@ -113,7 +117,8 @@ impl Engine {
     /// Returns `CoreError::Agent` if the planning agent cannot be started.
     #[instrument(skip(self))]
     pub async fn plan(&self, slug: &str) -> Result<PlanSession, CoreError> {
-        crate::plan::run_plan(self, slug).await
+        let slug = normalize_slug(slug);
+        crate::plan::run_plan(self, &slug).await
     }
 
     /// Execute a feature's development plan phase by phase.
@@ -121,13 +126,16 @@ impl Engine {
     /// Returns a [`RunStream`] handle for consuming progress events.
     /// The CLI reads events from the stream to update its progress display.
     ///
+    /// The slug is normalized before use (see [`plan()`](Engine::plan)).
+    ///
     /// # Errors
     ///
     /// Returns `CoreError::NotInitialized` if the repo is not initialized.
     /// Returns `CoreError::FeatureNotFound` if the feature spec doesn't exist.
     #[instrument(skip(self))]
     pub async fn run(&self, slug: &str) -> Result<RunStream, CoreError> {
-        crate::run::run_execution(self, slug).await
+        let slug = normalize_slug(slug);
+        crate::run::run_execution(self, &slug).await
     }
 
     /// Returns a reference to the engine configuration.
@@ -159,6 +167,29 @@ impl Engine {
     pub fn gba_dir(&self) -> PathBuf {
         self.config.gba_dir()
     }
+}
+
+/// Normalize a feature slug for use as a directory name and branch component.
+///
+/// Strips common branch prefixes (`feat/`, `feature/`) and replaces any
+/// remaining `/` characters with `_`.
+fn normalize_slug(slug: &str) -> String {
+    let stripped = slug
+        .strip_prefix("feat/")
+        .or_else(|| slug.strip_prefix("feature/"))
+        .unwrap_or(slug);
+
+    let normalized = stripped.replace('/', "_");
+
+    if normalized != slug {
+        warn!(
+            original = slug,
+            normalized = %normalized,
+            "slug was normalized"
+        );
+    }
+
+    normalized
 }
 
 #[cfg(test)]
@@ -234,6 +265,30 @@ mod tests {
         let result = engine.run("test_feature").await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), CoreError::NotInitialized));
+    }
+
+    #[test]
+    fn test_should_normalize_slug_with_feat_prefix() {
+        assert_eq!(normalize_slug("feat/0002-log-to-file"), "0002-log-to-file");
+    }
+
+    #[test]
+    fn test_should_normalize_slug_with_feature_prefix() {
+        assert_eq!(normalize_slug("feature/my-feature"), "my-feature");
+    }
+
+    #[test]
+    fn test_should_normalize_slug_with_slashes() {
+        assert_eq!(normalize_slug("some/nested/slug"), "some_nested_slug");
+    }
+
+    #[test]
+    fn test_should_keep_valid_slug_unchanged() {
+        assert_eq!(
+            normalize_slug("0001_core_architecture"),
+            "0001_core_architecture"
+        );
+        assert_eq!(normalize_slug("my-feature"), "my-feature");
     }
 
     #[tokio::test]

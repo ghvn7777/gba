@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use tracing::info;
 
-use gba_core::{Engine, EngineConfig, RunEvent};
+use gba_core::{Engine, EngineConfig, PlanEvent, RunEvent};
 
 /// CLI entry point for GBA -- Claude Agent powered repo automation.
 #[derive(Debug, Parser)]
@@ -92,12 +92,49 @@ impl Cli {
                 let engine = Engine::new(config)
                     .await
                     .context("failed to create engine")?;
-                let _session = engine
+                let mut session = engine
                     .plan(&slug)
                     .await
                     .context("failed to start plan session")?;
-                // Plan workflow will be implemented in Phase 4.
-                println!("Plan session started for '{slug}'. (Phase 4 implementation pending)");
+
+                while let Some(event) = session.next().await {
+                    match event {
+                        PlanEvent::Message(text) => {
+                            println!("{text}");
+                        }
+                        PlanEvent::WaitingForInput => {
+                            let input = tokio::task::spawn_blocking(|| {
+                                use std::io::Write;
+                                print!("> ");
+                                std::io::stdout().flush().ok();
+                                let mut line = String::new();
+                                std::io::stdin().read_line(&mut line).map(|_| line)
+                            })
+                            .await?
+                            .context("failed to read input")?;
+
+                            let trimmed = input.trim();
+                            if !trimmed.is_empty() {
+                                session
+                                    .respond(trimmed)
+                                    .await
+                                    .context("failed to send input")?;
+                            }
+                        }
+                        PlanEvent::SpecGenerated { path, .. } => {
+                            println!("[x] Generated: {}", path.display());
+                        }
+                        PlanEvent::Completed => {
+                            println!("\nPlan complete. Run `gba run {slug}` to execute.");
+                            break;
+                        }
+                        PlanEvent::Error(e) => {
+                            eprintln!("[!] Error: {e}");
+                            break;
+                        }
+                    }
+                }
+
                 Ok(())
             }
             Commands::Run { slug, repo, model } => {
